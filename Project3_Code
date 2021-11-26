@@ -1,0 +1,105 @@
+/* Example code for TM1637 4 digit 7 segment display with Arduino. More info: www.www.makerguides.com */
+#include <Time.h>
+​
+// Include the library:
+#include <TM1637Display.h>
+​
+// Define the connections pins: 7 SEGMENT DIGIT DISPLAY SETUP
+#define CLK 3
+#define DIO 4
+​
+// Create display object of type TM1637Display:
+TM1637Display display = TM1637Display(CLK, DIO);
+​
+// Create array that turns all segments on:
+const uint8_t data[] = {0xff, 0xff, 0xff, 0xff};
+​
+// Create array that turns all segments off:
+const uint8_t blank[] = {0x00, 0x00, 0x00, 0x00};
+​
+// You can set the individual segments per digit to spell words or create other symbols:
+const uint8_t done[] = {
+  SEG_B | SEG_C | SEG_D | SEG_E | SEG_G,           // d
+  SEG_A | SEG_B | SEG_C | SEG_D | SEG_E | SEG_F,   // O
+  SEG_C | SEG_E | SEG_G,                           // n
+  SEG_A | SEG_D | SEG_E | SEG_F | SEG_G            // E
+};
+​
+// Create degree Celsius symbol:
+const uint8_t celsius[] = {
+  SEG_A | SEG_B | SEG_F | SEG_G,  // Circle
+  SEG_A | SEG_D | SEG_E | SEG_F   // C
+};
+​
+// PIR SENSOR
+int pirPin = 9;
+int pirStat = 0;                   // PIR status
+​
+int buzzer = 3;
+​
+int rep_count = 0;
+boolean movement = false;         // movement detected flag
+​
+int minimum_rest_time = 1250;     // value for minimum rest time to be used to check if user is performing exercise too quickly (1.25s)
+int maximum_rest_time = 6000;     // value for max rest time to be used to check if the user is taking too long a break in between reps (6s)
+​
+time_t previous_movement = millis();
+time_t current_movement = millis();
+time_t no_movement = millis();
+​
+​
+void setup() {
+  pinMode(buzzer, OUTPUT);
+  pinMode(pirPin, INPUT); 
+  display.setBrightness(7);
+  display.showNumberDec(rep_count);
+  Serial.begin(9600);
+}
+​
+void loop(){
+​
+  pirStat = digitalRead(pirPin); 
+  Serial.println(pirStat); 
+​
+ if(pirStat == LOW ) {
+  movement = false;
+  no_movement = millis();
+ }
+ 
+ else {
+  movement = true;
+  current_movement = millis();
+ }
+​
+ // check the difference in time between previous detection and current detection
+ int movement_difference = current_movement - previous_movement;
+​
+ // check the delay between the previous movement and the last no movement detected
+ int delay_between_reps = no_movement - previous_movement;
+​
+ // proper rep (i.e. there is movement detected and it was between the min and max rest times
+ if(movement && (minimum_rest_time < movement_difference && movement_difference < maximum_rest_time)) {
+    rep_count++;
+    display.showNumberDec(rep_count);
+    previous_movement = millis();
+    tone(buzzer, 750, 250);   // quick beep to simulate a check mark/successful rep
+ }
+​
+ // too quick of a rep/motion
+ else if(movement && (minimum_rest_time > movement_difference)) {
+    previous_movement = millis();
+    tone(buzzer, 1200, 1500);   // louder longer beep to let user know it was too quick of a rep
+ }
+​
+ // user is taking too long between reps (three beep sequence to motivate the user to get moving)
+ else if(!movement && (delay_between_reps > maximum_rest_time)) {
+    tone(buzzer, 1200, 400);
+    delay(100);
+    tone(buzzer, 1200, 400);
+    delay(100);
+    tone(buzzer, 1200, 400);
+    delay(100);
+ }
+ 
+ 
+}
